@@ -2,12 +2,16 @@ import { useState, useRef } from "react";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ImagePlus, X } from "lucide-react";
+import { ImagePlus, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CreatePost = () => {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const { user } = useAuth();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
   const [isPosting, setIsPosting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -20,33 +24,72 @@ const CreatePost = () => {
         toast.error("Please select an image file");
         return;
       }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("Image must be less than 10MB");
+        return;
+      }
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onload = () => {
-        setSelectedImage(reader.result as string);
+        setPreviewUrl(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
 
   const handleRemoveImage = () => {
-    setSelectedImage(null);
+    setSelectedFile(null);
+    setPreviewUrl(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
   const handlePost = async () => {
-    if (!selectedImage) {
+    if (!selectedFile || !user) {
       toast.error("Please select an image");
       return;
     }
 
     setIsPosting(true);
-    // Simulate posting
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsPosting(false);
-    toast.success("Post shared successfully!");
-    navigate("/");
+
+    try {
+      // Upload image to storage
+      const fileExt = selectedFile.name.split(".").pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("posts")
+        .upload(fileName, selectedFile);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from("posts")
+        .getPublicUrl(fileName);
+
+      // Create post record
+      const { error: postError } = await supabase.from("posts").insert({
+        user_id: user.id,
+        image_url: publicUrl,
+        caption: caption.trim() || null,
+      });
+
+      if (postError) {
+        throw postError;
+      }
+
+      toast.success("Post shared successfully!");
+      navigate("/");
+    } catch (error) {
+      console.error("Error creating post:", error);
+      toast.error("Failed to create post");
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   return (
@@ -57,19 +100,26 @@ const CreatePost = () => {
           <h1 className="text-2xl font-bold">New Post</h1>
           <Button
             onClick={handlePost}
-            disabled={!selectedImage || isPosting}
+            disabled={!selectedFile || isPosting}
             className="gradient-primary border-0"
           >
-            {isPosting ? "Sharing..." : "Share"}
+            {isPosting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Sharing...
+              </>
+            ) : (
+              "Share"
+            )}
           </Button>
         </div>
 
         {/* Image Upload */}
         <div className="space-y-4">
-          {selectedImage ? (
+          {previewUrl ? (
             <div className="relative rounded-2xl overflow-hidden shadow-card animate-fade-in">
               <img
-                src={selectedImage}
+                src={previewUrl}
                 alt="Selected"
                 className="w-full aspect-square object-cover"
               />

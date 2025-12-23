@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileGrid } from "@/components/profile/ProfileGrid";
@@ -11,13 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { LogOut, Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
-// Mock posts for now
-const mockPosts = [
-  { id: "1", imageUrl: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=400&fit=crop" },
-  { id: "2", imageUrl: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&h=400&fit=crop" },
-  { id: "3", imageUrl: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400&h=400&fit=crop" },
-];
+interface Post {
+  id: string;
+  imageUrl: string;
+}
 
 const Profile = () => {
   const { user, profile, signOut, updateProfile, uploadAvatar, refreshProfile } = useAuth();
@@ -25,11 +24,45 @@ const Profile = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const [editForm, setEditForm] = useState({
     username: profile?.username || "",
     bio: profile?.bio || "",
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (user) {
+      fetchPosts();
+      fetchFollowCounts();
+    }
+  }, [user]);
+
+  const fetchPosts = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("posts")
+      .select("id, image_url")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (data) {
+      setPosts(data.map(p => ({ id: p.id, imageUrl: p.image_url })));
+    }
+  };
+
+  const fetchFollowCounts = async () => {
+    if (!user) return;
+    const [followersRes, followingRes] = await Promise.all([
+      supabase.from("follows").select("id", { count: "exact" }).eq("following_id", user.id),
+      supabase.from("follows").select("id", { count: "exact" }).eq("follower_id", user.id),
+    ]);
+
+    setFollowersCount(followersRes.count || 0);
+    setFollowingCount(followingRes.count || 0);
+  };
 
   const handleLogout = async () => {
     await signOut();
@@ -117,16 +150,16 @@ const Profile = () => {
             username={profile.username}
             avatar={profile.avatar_url || undefined}
             bio={profile.bio || undefined}
-            postsCount={mockPosts.length}
-            followersCount={0}
-            followingCount={0}
+            postsCount={posts.length}
+            followersCount={followersCount}
+            followingCount={followingCount}
             isOwnProfile={true}
             onEditProfile={handleEditProfile}
           />
         </div>
 
         <div className="animate-slide-up" style={{ animationDelay: "0.1s" }}>
-          <ProfileGrid posts={mockPosts} />
+          <ProfileGrid posts={posts} />
         </div>
       </div>
 

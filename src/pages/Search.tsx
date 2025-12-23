@@ -103,10 +103,10 @@ const Search = () => {
               >
                 <UserSearchItem
                   id={u.id}
+                  userId={u.user_id}
                   username={u.username}
                   avatar={u.avatar_url || undefined}
                   bio={u.bio || undefined}
-                  onFollow={(id) => console.log("Follow:", id)}
                 />
               </div>
             ))}
