@@ -103,9 +103,9 @@ const Auth = () => {
           <Camera className="h-10 w-10 text-primary-foreground" />
         </div>
         <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">
-          Pixie
+          Togetherly
         </h1>
-        <p className="text-muted-foreground mt-2">Share moments with friends</p>
+        <p className="text-muted-foreground mt-2">Connect with friends</p>
       </div>
 
       {/* Form Card */}
