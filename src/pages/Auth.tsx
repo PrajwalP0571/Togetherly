@@ -1,11 +1,27 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Camera } from "lucide-react";
+import { Eye, EyeOff, Camera, User } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { z } from "zod";
+
+const signUpSchema = z.object({
+  email: z.string().email("Please enter a valid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .max(20, "Username must be less than 20 characters")
+    .regex(/^[a-zA-Z0-9._]+$/, "Username can only contain letters, numbers, dots, and underscores"),
+});
+
+const signInSchema = z.object({
+  email: z.string().email("Please enter a valid email"),
+  password: z.string().min(1, "Password is required"),
+});
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -16,28 +32,67 @@ const Auth = () => {
     password: "",
     username: "",
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
+  const { signUp, signIn } = useAuth();
+
+  const validateForm = () => {
+    try {
+      if (isLogin) {
+        signInSchema.parse(formData);
+      } else {
+        signUpSchema.parse(formData);
+      }
+      setErrors({});
+      return true;
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const newErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            newErrors[err.path[0].toString()] = err.message;
+          }
+        });
+        setErrors(newErrors);
+      }
+      return false;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.email || !formData.password) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
-    if (!isLogin && !formData.username) {
-      toast.error("Please enter a username");
+    if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
-    // Simulate auth
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsLoading(false);
 
-    toast.success(isLogin ? "Welcome back!" : "Account created successfully!");
-    navigate("/");
+    try {
+      if (isLogin) {
+        const { error } = await signIn(formData.email, formData.password);
+        if (error) {
+          toast.error(error.message || "Invalid email or password");
+          setIsLoading(false);
+          return;
+        }
+        toast.success("Welcome back!");
+        navigate("/");
+      } else {
+        const { error } = await signUp(formData.email, formData.password, formData.username);
+        if (error) {
+          toast.error(error.message || "Failed to create account");
+          setIsLoading(false);
+          return;
+        }
+        toast.success("Account created successfully!");
+        navigate("/");
+      }
+    } catch (error) {
+      toast.error("Something went wrong. Please try again.");
+    }
+
+    setIsLoading(false);
   };
 
   return (
@@ -55,20 +110,30 @@ const Auth = () => {
 
       {/* Form Card */}
       <div className="w-full max-w-sm bg-card rounded-2xl shadow-card p-6 animate-slide-up">
+        <h2 className="text-xl font-semibold text-center mb-6">
+          {isLogin ? "Welcome back" : "Create your account"}
+        </h2>
+        
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="your.username"
-                value={formData.username}
-                onChange={(e) =>
-                  setFormData({ ...formData, username: e.target.value })
-                }
-                className="bg-background"
-              />
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="your.username"
+                  value={formData.username}
+                  onChange={(e) =>
+                    setFormData({ ...formData, username: e.target.value.toLowerCase() })
+                  }
+                  className="bg-background pl-10"
+                />
+              </div>
+              {errors.username && (
+                <p className="text-xs text-destructive">{errors.username}</p>
+              )}
             </div>
           )}
 
@@ -84,6 +149,9 @@ const Auth = () => {
               }
               className="bg-background"
             />
+            {errors.email && (
+              <p className="text-xs text-destructive">{errors.email}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -111,6 +179,9 @@ const Auth = () => {
                 )}
               </button>
             </div>
+            {errors.password && (
+              <p className="text-xs text-destructive">{errors.password}</p>
+            )}
           </div>
 
           <Button
@@ -134,7 +205,10 @@ const Auth = () => {
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
               type="button"
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setErrors({});
+              }}
               className="text-primary font-medium hover:underline"
             >
               {isLogin ? "Sign up" : "Sign in"}

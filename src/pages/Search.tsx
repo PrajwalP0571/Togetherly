@@ -1,84 +1,58 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { UserSearchItem } from "@/components/search/UserSearchItem";
 import { Input } from "@/components/ui/input";
-import { Search as SearchIcon, Users, X } from "lucide-react";
+import { Search as SearchIcon, Users, X, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
-// Mock users data - will be replaced with real data from database
-const mockUsers = [
-  {
-    id: "1",
-    username: "sarah.design",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop",
-    bio: "Designer & photographer",
-    isFollowing: true,
-  },
-  {
-    id: "2",
-    username: "alex.captures",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop",
-    bio: "Landscape photography",
-    isFollowing: false,
-  },
-  {
-    id: "3",
-    username: "maya.lens",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop",
-    bio: "Travel • Nature • Life",
-    isFollowing: false,
-  },
-  {
-    id: "4",
-    username: "travel.with.emma",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop",
-    bio: "Exploring the world one photo at a time",
-    isFollowing: false,
-    isRequested: true,
-  },
-  {
-    id: "5",
-    username: "photo.wanderer",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop",
-    bio: "Mountain enthusiast",
-    isFollowing: false,
-  },
-  {
-    id: "6",
-    username: "nature.explorer",
-    avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=150&h=150&fit=crop",
-    bio: "Wildlife & nature photography",
-    isFollowing: false,
-  },
-  {
-    id: "7",
-    username: "sunset.chaser",
-    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop",
-    bio: "Chasing golden hours",
-    isFollowing: true,
-  },
-  {
-    id: "8",
-    username: "mountain.vibes",
-    avatar: "https://images.unsplash.com/photo-1552058544-f2b08422138a?w=150&h=150&fit=crop",
-    bio: "Adventure seeker",
-    isFollowing: false,
-  },
-];
+interface UserProfile {
+  id: string;
+  user_id: string;
+  username: string;
+  bio: string | null;
+  avatar_url: string | null;
+}
 
 const Search = () => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .neq("user_id", user?.id || "")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching users:", error);
+      } else {
+        setUsers(data as UserProfile[]);
+      }
+      setLoading(false);
+    };
+
+    if (user) {
+      fetchUsers();
+    }
+  }, [user]);
 
   const filteredUsers = useMemo(() => {
     if (!searchQuery.trim()) {
-      return mockUsers;
+      return users;
     }
     const query = searchQuery.toLowerCase();
-    return mockUsers.filter(
-      (user) =>
-        user.username.toLowerCase().includes(query) ||
-        user.bio?.toLowerCase().includes(query)
+    return users.filter(
+      (u) =>
+        u.username.toLowerCase().includes(query) ||
+        u.bio?.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [searchQuery, users]);
 
   const handleClearSearch = () => {
     setSearchQuery("");
@@ -116,19 +90,34 @@ const Search = () => {
         </div>
 
         {/* Results */}
-        {filteredUsers.length > 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : filteredUsers.length > 0 ? (
           <div className="space-y-3">
-            {filteredUsers.map((user, index) => (
+            {filteredUsers.map((u, index) => (
               <div
-                key={user.id}
+                key={u.id}
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
                 <UserSearchItem
-                  {...user}
+                  id={u.id}
+                  username={u.username}
+                  avatar={u.avatar_url || undefined}
+                  bio={u.bio || undefined}
                   onFollow={(id) => console.log("Follow:", id)}
                 />
               </div>
             ))}
+          </div>
+        ) : users.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+            <p className="text-lg font-medium">No users yet</p>
+            <p className="text-sm mt-1">
+              Be the first to invite your friends!
+            </p>
           </div>
         ) : (
           <div className="text-center py-16 text-muted-foreground">
