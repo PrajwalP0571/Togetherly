@@ -1,10 +1,10 @@
-import { Home, PlusSquare, MessageCircle, User, Users } from "lucide-react";
+import { Home, Search, PlusSquare, MessageCircle, User } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
-  { icon: Users, label: "Requests", path: "/requests" },
+  { icon: Search, label: "Search", path: "/search" },
   { icon: PlusSquare, label: "Create", path: "/create" },
   { icon: MessageCircle, label: "Messages", path: "/messages" },
   { icon: User, label: "Profile", path: "/profile" },

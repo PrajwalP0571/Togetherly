@@ -1,4 +1,4 @@
-import { Bell } from "lucide-react";
+import { Bell, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export const Header = () => {
@@ -10,10 +10,18 @@ export const Header = () => {
             Pixie
           </span>
         </Link>
-        <button className="p-2 rounded-full hover:bg-accent transition-colors relative">
-          <Bell className="h-5 w-5 text-muted-foreground" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-primary rounded-full" />
-        </button>
+        <div className="flex items-center gap-1">
+          <Link
+            to="/requests"
+            className="p-2 rounded-full hover:bg-accent transition-colors relative"
+          >
+            <Users className="h-5 w-5 text-muted-foreground" />
+            <span className="absolute top-1 right-1 h-2 w-2 bg-primary rounded-full" />
+          </Link>
+          <button className="p-2 rounded-full hover:bg-accent transition-colors relative">
+            <Bell className="h-5 w-5 text-muted-foreground" />
+          </button>
+        </div>
       </div>
     </header>
   );
